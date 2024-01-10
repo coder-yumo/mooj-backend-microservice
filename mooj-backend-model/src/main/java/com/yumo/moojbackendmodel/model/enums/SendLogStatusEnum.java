@@ -7,25 +7,23 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 题目提交枚举
+ * 用户角色枚举
  *
  * @author  yumo
  *  
  */
-public enum QuestionSubmitStatusEnum {
+public enum SendLogStatusEnum {
+    //0-发送中 1-发送成功 2-发送失败
 
-    // 0 - 待判题、1 - 判题中、2 - 成功、3 - 失败
-    WAITING("等待中", 0),
-    RUNNING("判题中", 1),
-    SUCCEED("成功", 2),
-
-    FAILED("失败", 3);
+    Sending("发送中", 0),
+    SEND_SUCCESS("发送中", 1),
+    SEND_ERROR("发送失败", 2);
 
     private final String text;
 
     private final Integer value;
 
-    QuestionSubmitStatusEnum(String text, Integer value) {
+    SendLogStatusEnum(String text, Integer value) {
         this.text = text;
         this.value = value;
     }
@@ -45,17 +43,18 @@ public enum QuestionSubmitStatusEnum {
      * @param value
      * @return
      */
-    public static QuestionSubmitStatusEnum getEnumByValue(Integer value) {
+    public static SendLogStatusEnum getEnumByValue(Integer value) {
         if (ObjectUtils.isEmpty(value)) {
             return null;
         }
-        for (QuestionSubmitStatusEnum anEnum : QuestionSubmitStatusEnum.values()) {
+        for (SendLogStatusEnum anEnum : SendLogStatusEnum.values()) {
             if (anEnum.value.equals(value)) {
                 return anEnum;
             }
         }
         return null;
     }
+
 
     public Integer getValue() {
         return value;

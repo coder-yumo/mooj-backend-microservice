@@ -58,9 +58,9 @@ public class JavaLanguageJudgeStrategy implements JudgeStrategy {
             judgeInfoResponse.setMessage(judgeInfoMessageEnum.getValue());
             return judgeInfoResponse;
         }
-        // Java 程序本身需要额外执行 10 秒钟
-        long JAVA_PROGRAM_TIME_COST = 10000L;
-        if ((time - JAVA_PROGRAM_TIME_COST) > needTimeLimit) {
+        // Java 程序本身需要额外执行 5 秒钟
+//        long JAVA_PROGRAM_TIME_COST = 5000L;
+        if (time  > needTimeLimit) {
             judgeInfoMessageEnum = JudgeInfoMessageEnum.TIME_LIMIT_EXCEEDED;
             judgeInfoResponse.setMessage(judgeInfoMessageEnum.getValue());
             return judgeInfoResponse;

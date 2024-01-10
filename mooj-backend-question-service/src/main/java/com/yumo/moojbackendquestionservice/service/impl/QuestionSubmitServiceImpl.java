@@ -4,19 +4,23 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yumo.moojbackendcommon.common.ErrorCode;
+import com.yumo.moojbackendcommon.config.MessageSendConfig;
 import com.yumo.moojbackendcommon.constant.CommonConstant;
 import com.yumo.moojbackendcommon.exception.BusinessException;
 import com.yumo.moojbackendcommon.utils.SqlUtils;
 import com.yumo.moojbackendmodel.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.yumo.moojbackendmodel.model.dto.questionsubmit.QuestionSubmitQueryRequest;
+import com.yumo.moojbackendmodel.model.entity.MassageSendLog;
 import com.yumo.moojbackendmodel.model.entity.Question;
 import com.yumo.moojbackendmodel.model.entity.QuestionSubmit;
 import com.yumo.moojbackendmodel.model.entity.User;
 import com.yumo.moojbackendmodel.model.enums.QuestionSubmitLanguageEnum;
 import com.yumo.moojbackendmodel.model.enums.QuestionSubmitStatusEnum;
+import com.yumo.moojbackendmodel.model.enums.SendLogStatusEnum;
 import com.yumo.moojbackendmodel.model.vo.QuestionSubmitVO;
 import com.yumo.moojbackendquestionservice.mapper.QuestionSubmitMapper;
 import com.yumo.moojbackendquestionservice.rabbitmq.MyMessageProducer;
+import com.yumo.moojbackendquestionservice.service.MassageSendLogService;
 import com.yumo.moojbackendquestionservice.service.QuestionService;
 import com.yumo.moojbackendquestionservice.service.QuestionSubmitService;
 import com.yumo.moojbackendserviceclient.service.JudgeFeignClient;
@@ -24,11 +28,15 @@ import com.yumo.moojbackendserviceclient.service.UserFeignClient;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +60,12 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
 
     @Resource
     private MyMessageProducer myMessageProducer;
+
+    @Resource
+    private RabbitTemplate rabbitTemplate;
+
+    @Resource
+    private MassageSendLogService massageSendLogService;
 
     /**
      * 提交题目
@@ -90,12 +104,30 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "数据插入失败");
         }
         Long questionSubmitId = questionSubmit.getId();
+
+        // 存储消息发送的信息
+        String msgId = UUID.randomUUID().toString();
+        MassageSendLog sendLog = new MassageSendLog();
+        sendLog.setMsgId(msgId);
+        // 题目提交id
+        sendLog.setQuestionSubmitId(questionSubmitId);
+        // 队列名字
+        sendLog.setRouteKey(MessageSendConfig.SEND_CODE_QUEUE_NAME);
+        // 交换机名字
+        sendLog.setExchange(MessageSendConfig.SEND_CODE_EXCHANGE_NAME);
+        // 表示消息正在发送
+        sendLog.setStatus(SendLogStatusEnum.Sending.getValue());
+        // 表示没重试 最多重试三次
+        sendLog.setTryCount(0);
+        // 设置重试时间在一分钟之后
+        sendLog.setTryTime(new Date(System.currentTimeMillis() + 60 * 1000));
+        boolean sendLogSave = massageSendLogService.save(sendLog);
+        if (!sendLogSave){
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "日志插入失败");
+        }
         // 发送消息
-        myMessageProducer.sendMessage("code_exchange", "my_routingKey", String.valueOf(questionSubmitId));
-        // 执行判题服务
-//        CompletableFuture.runAsync(() -> {
-//            judgeFeignClient.doJudge(questionSubmitId);
-//        });
+        rabbitTemplate.convertAndSend(MessageSendConfig.SEND_CODE_EXCHANGE_NAME,
+                MessageSendConfig.SEND_CODE_QUEUE_NAME,questionSubmitId,new CorrelationData(msgId));
         return questionSubmitId;
     }
 
@@ -152,7 +184,15 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         List<QuestionSubmitVO> questionSubmitVOList = questionSubmitList.stream()
                 .map(questionSubmit -> getQuestionSubmitVO(questionSubmit, loginUser))
                 .collect(Collectors.toList());
-        questionSubmitVOPage.setRecords(questionSubmitVOList);
+        List<QuestionSubmitVO> finalQuestionSubmitVOList = questionSubmitVOList.stream()
+                .map(questionSubmitVO -> {
+                    // 获取状态对应的文本值并设置到对象中
+                    String statusText = QuestionSubmitStatusEnum.getEnumByValue(questionSubmitVO.getStatus()).getText();
+                    questionSubmitVO.setStatusValue(statusText);
+                    return questionSubmitVO;
+                })
+                .collect(Collectors.toList());
+        questionSubmitVOPage.setRecords(finalQuestionSubmitVOList);
         return questionSubmitVOPage;
     }
 

@@ -10,6 +10,13 @@
     </parent>
 
     <artifactId>mooj-backend-common</artifactId>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+    </dependencies>
+
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>

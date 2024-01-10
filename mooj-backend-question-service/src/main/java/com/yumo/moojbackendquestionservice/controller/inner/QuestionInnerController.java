@@ -1,5 +1,6 @@
 package com.yumo.moojbackendquestionservice.controller.inner;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.yumo.moojbackendmodel.model.entity.Question;
 import com.yumo.moojbackendmodel.model.entity.QuestionSubmit;
 import com.yumo.moojbackendquestionservice.service.QuestionService;
@@ -38,6 +39,35 @@ public class QuestionInnerController implements QuestionFeignClient {
     @Override
     public boolean updateQuestionSubmitById(@RequestBody QuestionSubmit questionSubmit) {
         return questionSubmitService.updateById(questionSubmit);
+    }
+
+    /**
+     * 添加题目提交数
+     *
+     * @param questionSubmitId
+     * @return
+     */
+    @PostMapping("/add/submitNum")
+    public boolean addSubmitNum(@RequestParam("questionSubmitId") long questionSubmitId) {
+        QuestionSubmit questionSubmit = questionSubmitService.getById(questionSubmitId);
+        QueryWrapper<Question> queryWrapper = new QueryWrapper<>();
+        queryWrapper.lambda().eq(Question::getId, questionSubmit.getQuestionId());
+        Question question = questionService.getOne(queryWrapper);
+        question.setSubmitNum(question.getSubmitNum() + 1);
+        return questionService.updateById(question);
+    }
+
+    /**
+     * 添加题目通过数
+     *
+     * @param questionId
+     * @return
+     */
+    @PostMapping("/add/acceptedNum")
+    public boolean addAcceptedNum(@RequestParam("questionId") long questionId) {
+        Question question = questionService.getById(questionId);
+        question.setAcceptedNum(question.getAcceptedNum() + 1);
+        return questionService.updateById(question);
     }
 
 }

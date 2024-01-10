@@ -13,10 +13,12 @@ import com.yumo.moojbackendmodel.model.codesandbox.JudgeInfo;
 import com.yumo.moojbackendmodel.model.dto.question.JudgeCase;
 import com.yumo.moojbackendmodel.model.entity.Question;
 import com.yumo.moojbackendmodel.model.entity.QuestionSubmit;
+import com.yumo.moojbackendmodel.model.enums.JudgeInfoMessageEnum;
 import com.yumo.moojbackendmodel.model.enums.QuestionSubmitStatusEnum;
 import com.yumo.moojbackendserviceclient.service.QuestionFeignClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -36,6 +38,7 @@ public class JudgeServiceImpl implements JudgeService {
 
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public QuestionSubmit doJudge(long questionSubmitId) {
         // 1）传入题目的提交 id，获取到对应的题目、提交信息（包含代码、编程语言等）
         QuestionSubmit questionSubmit = questionFeignClient.getQuestionSubmitById(questionSubmitId);
@@ -84,7 +87,7 @@ public class JudgeServiceImpl implements JudgeService {
         judgeContext.setQuestion(question);
         judgeContext.setQuestionSubmit(questionSubmit);
         JudgeInfo judgeInfo = judgeManager.doJudge(judgeContext);
-        // 6）修改数据库中的判题结果
+        // 6）修改数据库中的题目提交判题结果
         questionSubmitUpdate = new QuestionSubmit();
         questionSubmitUpdate.setId(questionSubmitId);
         questionSubmitUpdate.setStatus(QuestionSubmitStatusEnum.SUCCEED.getValue());
@@ -92,6 +95,13 @@ public class JudgeServiceImpl implements JudgeService {
         update = questionFeignClient.updateQuestionSubmitById(questionSubmitUpdate);
         if (!update) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "题目状态更新错误");
+        }
+        // 7）如果代码通过，修改题目表的通过数
+        if (JudgeInfoMessageEnum.ACCEPTED.getValue().equals(judgeInfo.getMessage())){
+            boolean updateAcceptedNum = questionFeignClient.addAcceptedNum(questionId);
+            if (!updateAcceptedNum){
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "题目通过数更新错误");
+            }
         }
         QuestionSubmit questionSubmitResult = questionFeignClient.getQuestionSubmitById(questionId);
         return questionSubmitResult;

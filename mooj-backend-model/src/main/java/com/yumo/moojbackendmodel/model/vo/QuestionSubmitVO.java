@@ -40,6 +40,8 @@ public class QuestionSubmitVO implements Serializable {
      */
     private Integer status;
 
+    private String statusValue;
+
     /**
      * 题目 id
      */
