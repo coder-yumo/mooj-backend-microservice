@@ -11,7 +11,7 @@ import com.yumo.moojbackendmodel.model.entity.User;
 import com.yumo.moojbackendmodel.model.vo.QuestionSubmitVO;
 
 /**
-* @author 李鱼皮
+* @author yumo
 * @description 针对表【question_submit(题目提交)】的数据库操作Service
 * @createDate 2023-08-07 20:58:53
 */
